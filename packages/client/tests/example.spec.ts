@@ -6,13 +6,21 @@ test('has title', async ({ page }) => {
 })
 
 test('shows server message', async ({ page }) => {
-  await page.route('https://localhost:3001/health', async (route) => {
-    const json = { message: 'template', status: 'ok' }
+  const apiUrl = process.env.VITE_API_URL || 'https://localhost:3002/graphql'
+  await page.route(apiUrl, async (route) => {
+    const json = {
+      data: {
+        me: {
+          did: 'did:key:z6MkhaX',
+          perspective: { name: 'Public Profile' }
+        }
+      }
+    }
     await route.fulfill({ json })
   })
+
   await page.goto('/')
-  await expect(page.getByText('Client')).toBeVisible()
-  // Wait for fetch
-  await expect(page.getByText('Shared: template')).toBeVisible()
-  await expect(page.getByText('Server: template ok')).toBeVisible()
+
+  // The Home component sets message to: `Agent: ${did}... | Perspective: ${name}`
+  await expect(page.getByText('Agent: did:key:z6MkhaX... | Perspective: Public Profile')).toBeVisible()
 })

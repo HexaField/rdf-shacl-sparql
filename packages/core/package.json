@@ -19,7 +19,22 @@
     "check": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@noble/curves": "^2.0.1",
+    "@rdfjs/dataset": "^2.0.2",
+    "@rdfjs/term-map": "^2.0.2",
+    "@types/jsonld": "^1.5.15",
+    "@types/n3": "^1.26.1",
+    "jsonld": "^9.0.0",
+    "multiformats": "^13.4.2",
+    "n3": "^2.0.1",
+    "oxigraph": "^0.5.4",
+    "rdf-data-factory": "^2.0.2",
+    "rdf-validate-shacl": "0.5.2",
+    "uint8arrays": "^5.1.0"
+  },
   "devDependencies": {
+    "@rdfjs/types": "^2.0.1",
     "@rollup/plugin-typescript": "^12.3.0",
     "rollup": "^4.54.0",
     "tslib": "^2.8.1"

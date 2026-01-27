@@ -1,1 +1,1 @@
-always make sure `npm run check` and `npm run test` passes
+always make sure `pnpm check` and `pnpm test` passes

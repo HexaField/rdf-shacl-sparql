@@ -1,12 +1,10 @@
-/**
- * A constant shared between client and server.
- */
-export const SHARED_CONSTANT = 'template'
+export * from './store'
+export * from './identity'
+export * from './models'
+export * from './validation'
+export * from './query'
+export * from './network'
+export * from './agent'
+export const SHARED_CONSTANT = 'AD4M Core'
 
-/**
- * Adds two numbers together.
- * @param a The first number.
- * @param b The second number.
- * @returns The sum of a and b.
- */
-export const add = (a: number, b: number) => a + b
+export * from './ad4m/types'
