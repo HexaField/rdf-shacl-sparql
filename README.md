@@ -1,89 +1,68 @@
-# Template Monorepo
+# AD4M on W3C Standards: A Proof of Concept
 
-This is a modern, full-stack TypeScript monorepo template managed with **pnpm workspaces**. It provides a pre-configured environment for building scalable applications with a shared core library, a SolidJS client, and an Express server.
+This repository is an experimental proof-of-concept demonstrating a clean-room implementation of the [AD4M (Agent-Centric Distributed Application Meta-Ontology)](https://ad4m.dev) architecture, built entirely on top of standard W3C specifications.
 
-## 📂 Project Structure
+The goal is to show how agent-centric applications—where users own their data and communicate via peer-to-peer networks—can be built using standard semantic web technologies.
 
-The monorepo is organized into the following packages:
+## 🧪 The Experiment
 
-- **`packages/client`**: A frontend application built with **SolidJS**, **Vite**, and **Tailwind CSS**. It includes **Storybook** for component development and **Playwright** for end-to-end testing.
-- **`packages/server`**: A backend server built with **Express**. It uses **tsx** for fast development execution.
-- **`packages/core`**: A shared library containing common logic, types, or utilities used by both the client and server. It is bundled using **Rollup**.
+We are validating whether adherence to strict standards can achieve the core AD4M promises:
 
-## 🚀 Getting Started
+1.  **Agent-Centricity**: Identity is based on DIDs (`did:key`).
+2.  **Semantic Data**: All state is stored as RDF Quads (`Oxigraph`).
+3.  **Social DNA**: Validation rules are defined using SHACL (`rdf-validate-shacl`).
+4.  **Local-First Sync**: Application state is reconciled purely through data exchange, not central databases.
 
-### Prerequisites
+## ⚙️ How It Works
 
-- **Node.js** (Latest LTS recommended)
-- **pnpm** (Package manager)
+### 1. Identity & Data
 
-### Installation
+Every running instance acts as an **Agent**. The Agent holds a `did:key` and signs every piece of data they create. Data is stored locally in an RDF Graph.
 
-Install all dependencies across the monorepo:
+### 2. Perspectives (The Graph)
 
-```bash
-pnpm install
-```
+The Agent manages **Perspectives**. A Perspective is simply a named, isolated RDF graph. It contains **Links** (triples):
 
-### Development
+> `Author (DID) -> says -> "Hello World"`
 
-Start the development servers for both the client and server concurrently:
+### 3. Neighbourhoods (The Network)
 
-```bash
-pnpm dev
-```
+To communicate, Agents join **Neighbourhoods**. A Neighbourhood is a Perspective that syncs over a network. In this POC, we use a **Local Filesystem Carrier** to simulate P2P networking. Agents watch specific directories for new messages from peers.
 
-- **Client**: http://localhost:5173 (default Vite port)
-- **Server**: Check console output for port (typically configured in `src/index.ts`)
+### 4. Social DNA (Validation)
 
-## 🛠 Scripts
+When an Agent receives data from a peer, it doesn't just trust it. It validates it against the Neighbourhood's **Social DNA**. We map this concept to **SHACL** + **SPARQL**:
 
-Run these scripts from the root directory:
+- Does this data fit the Shape (Subject Class)?
+- If yes, accept it into the local graph.
+- If no, reject it.
 
-| Script         | Description                                                |
-| :------------- | :--------------------------------------------------------- |
-| `pnpm dev`     | Starts client and server in development mode concurrently. |
-| `pnpm build`   | Builds all packages in the workspace.                      |
-| `pnpm test`    | Runs tests across all packages (Vitest & Playwright).      |
-| `pnpm lint`    | Lints code using ESLint.                                   |
-| `pnpm format`  | Formats code using Prettier.                               |
-| `pnpm check`   | Runs type checking (`tsc`) and linting.                    |
-| `pnpm prepare` | Sets up Husky git hooks.                                   |
+## 🚀 Running the Demo
 
-## 🧰 Tech Stack & Tooling
+This repo includes a "Multi-Agent" dev script that spins up a semantic chat application.
 
-### Core Technologies
+1.  **Install dependencies**:
 
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Package Manager**: [pnpm](https://pnpm.io/) (Workspaces)
-- **Build Tools**: [Vite](https://vitejs.dev/) (Client), [Rollup](https://rollupjs.org/) (Core)
+    ```bash
+    pnpm install
+    ```
 
-### Frontend (`packages/client`)
+2.  **Run the multi-agent simulation**:
 
-- **Framework**: [SolidJS](https://www.solidjs.com/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Testing**: [Playwright](https://playwright.dev/)
-- **Documentation**: [Storybook](https://storybook.js.org/)
+    ```bash
+    pnpm dev:multi
+    ```
 
-### Backend (`packages/server`)
+    This starts:
+    - 2 Server processes (Agents) on ports 3005 and 3006.
+    - 1 Client build server.
 
-- **Framework**: [Express](https://expressjs.com/)
-- **Runtime**: [tsx](https://github.com/privatenumber/tsx) (TypeScript execution)
+3.  **Open the Agents**:
+    - **Agent A**: [http://localhost:5173/?port=3005](http://localhost:5173/?port=3005)
+    - **Agent B**: [http://localhost:5173/?port=3006](http://localhost:5173/?port=3006)
 
-### Shared (`packages/core`)
+4.  **Verify Sync**: Type a message in Agent A's window. You will see it appear in Agent B's window. Behind the scenes, Agent A signed an RDF Triple, wrote it to a shared inbox, Agent B picked it up, validated it against the Chat SHACL Shape, and displayed it.
 
-- **Testing**: [Vitest](https://vitest.dev/)
+## 📚 Architecture
 
-### DevOps & Code Quality
-
-- **Linting**: [ESLint](https://eslint.org/) (v9, Flat Config)
-- **Formatting**: [Prettier](https://prettier.io/)
-- **Git Hooks**: [Husky](https://typicode.github.io/husky/) & [lint-staged](https://github.com/okonet/lint-staged)
-- **CI/CD Readiness**: Scripts are optimized for CI environments (`check`, `test`, `build`).
-
-## ⚙️ Configuration Files
-
-- `pnpm-workspace.yaml`: Defines the workspace structure.
-- `eslint.config.ts`: Root ESLint configuration (Flat Config).
-- `prettier.config.js`: Prettier configuration.
-- `tsconfig.json`: Base TypeScript configuration.
+For a detailed breakdown of the mapping between AD4M concepts and W3C standards, see [ARCHITECTURE.md](./ARCHITECTURE.md).
