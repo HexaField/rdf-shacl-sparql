@@ -5,6 +5,7 @@ import type { Signer } from './types'
 // Export everything from here
 export * from './types'
 export * from './utils'
+export * from './Signing'
 
 export class KeyManager implements Signer {
   private privateKey: Uint8Array
