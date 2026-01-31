@@ -15,5 +15,5 @@
   "experimentalTailwindcss": {},
   "importOrderParserPlugins": ["typescript", "jsx", "decorators-legacy"],
   "importOrderTypeScriptVersion": "^5.9.3",
-  "ignorePatterns": []
+  "ignorePatterns": ["packages/ad4m"]
 }
