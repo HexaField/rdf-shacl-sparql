@@ -27,6 +27,8 @@ export class Agent {
   }
   private _neighbourhoods: Map<string, NeighbourhoodImpl> = new Map()
 
+  public holochain?: any
+
   private keys: KeyManager
   private store: QueryEngine | undefined
   private network: Carrier

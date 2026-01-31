@@ -12,7 +12,17 @@ import express from 'express'
 import healthRouter from './routes/health'
 
 // Core imports
-import { Agent, KeyManager, MockCarrier, ShaclLanguage, type Link, Libp2pCarrier } from '@template/core'
+import {
+  Agent,
+  KeyManager,
+  MockCarrier,
+  ShaclLanguage,
+  HolochainLanguage,
+  type Link,
+  Libp2pCarrier,
+  HolochainDriver,
+  DataFactory
+} from '@template/core'
 import { LocalFilesystemCarrier } from './network/LocalFilesystemCarrier'
 
 dotenv.config({ path: '.env.local' })
@@ -55,7 +65,36 @@ if (network instanceof Libp2pCarrier) {
   console.log('Libp2p Peer ID:', network.id)
 }
 
+// --- Holochain Setup ---
+const holochainDriver = new HolochainDriver()
+await holochainDriver.startHolochainConductor({
+  dataPath: process.env.HOLOCHAIN_DATA || path.join(os.tmpdir(), 'ad4m-holochain'),
+  conductorPath: process.env.HOLOCHAIN_PATH || 'holochain'
+})
+
+// Install main app if happ exists (for testing/dev)
+const happPath = path.resolve(
+  process.cwd(),
+  '../../packages/ad4m/bootstrap-languages/p-diff-sync/hc-dna/workdir/perspective-diff-sync.happ'
+)
+if (fs.existsSync(happPath)) {
+  console.log('[Server] Installing Holochain App:', happPath)
+  try {
+    // Check if checks if already installed? Driver doesn't check.
+    // But since dataPath is likely fresh or we can catch error
+    await holochainDriver.installApp({
+      path: happPath,
+      installed_app_id: 'main-app',
+      network_seed: 'test-seed'
+    })
+    console.log('[Server] App installed successfully')
+  } catch (e) {
+    console.warn('[Server] App install skipped/failed (might be already installed):', e)
+  }
+}
+
 const agent = new Agent(keys, undefined, network)
+agent.holochain = holochainDriver
 const mainPerspective = await agent.perspectives.add('Public Profile')
 
 // --- GraphQL Schema ---
@@ -131,19 +170,22 @@ const resolvers = {
       if (!p) throw new Error('Perspective not found')
 
       const allLinks = await p.all()
-      return allLinks
-        .filter((l) => {
-          if (query.source && l.data.source !== query.source) return false
-          if (query.predicate && l.data.predicate !== query.predicate) return false
-          if (query.target && l.data.target !== query.target) return false
-          return true
-        })
-        .map((l) => ({
-          author: l.author,
-          timestamp: l.timestamp,
-          data: { source: l.data.source, predicate: l.data.predicate, target: l.data.target },
-          proof: l.proof
-        }))
+      console.log(`[Server] Querying ${allLinks.length} links. Filter:`, query)
+
+      const filtered = allLinks.filter((l) => {
+        if (query.source && l.data.source !== query.source) return false
+        if (query.predicate && l.data.predicate !== query.predicate) return false
+        if (query.target && l.data.target !== query.target) return false
+        return true
+      })
+
+      console.log(`[Server] Filtered down to ${filtered.length} links`)
+      return filtered.map((l) => ({
+        author: l.author,
+        timestamp: l.timestamp,
+        data: { source: l.data.source, predicate: l.data.predicate, target: l.data.target },
+        proof: l.proof
+      }))
     },
     neighbourhood: (_: any, { url }: { url: string }) => {
       const n = agent.neighbourhoods.get(url)
@@ -172,8 +214,19 @@ const resolvers = {
       }
 
       if (isNeighbourhood && 'publish' in p) {
+        // Convert Link to Quads for Language.create()
+        const s = DataFactory.namedNode(link.source)
+        const pred = DataFactory.namedNode(link.predicate)
+        let o
+        if (link.target.startsWith('http') || link.target.startsWith('did:') || link.target.startsWith('urn:')) {
+          o = DataFactory.namedNode(link.target)
+        } else {
+          o = DataFactory.literal(link.target)
+        }
+        const quads = [DataFactory.quad(s, pred, o)]
+
         // @ts-ignore
-        await p.publish(newLink) // publish likely expects quads or raw data in ShaclLanguage
+        await p.publish(quads)
       } else {
         await p.add(newLink)
       }
@@ -200,7 +253,12 @@ const resolvers = {
       return true
     },
     neighbourhoodJoinFromUrl: async (_: any, { url }: { url: string }) => {
-      const lang = new ShaclLanguage()
+      // Choose language based on ENV
+      const useHolochain = process.env.LINK_LANGUAGE === 'holochain'
+      console.log(`[Server] Joining neighbourhood with LinkLanguage: ${useHolochain ? 'Holochain' : 'Shacl'}`)
+
+      const lang = useHolochain ? new HolochainLanguage(holochainDriver, 'main-app') : new ShaclLanguage()
+
       const n = await agent.neighbourhoods.join(url, lang)
       return { uuid: n.url, name: 'Joined Neighbourhood' }
     }

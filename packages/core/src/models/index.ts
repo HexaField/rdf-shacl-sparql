@@ -22,7 +22,7 @@ export async function createVC(
   const nquads = writer.quadsToString(claims)
 
   // fromRDF returns an array of graph nodes
-  const doc = await (jsonld as any).fromRDF(nquads, {
+  const doc = await ((jsonld as any).default ?? jsonld).fromRDF(nquads, {
     format: 'application/n-quads'
   })
 
@@ -44,7 +44,7 @@ export async function createVC(
   // We need to canonize the document to sign it.
   // We use URDNA2015 (standard for N-Quads in VC Data Integrity)
   // jsonld.canonize returns a string of N-Quads.
-  const canonized = (await (jsonld as any).canonize(vcRaw, {
+  const canonized = (await ((jsonld as any).default ?? jsonld).canonize(vcRaw, {
     algorithm: 'URDNA2015',
     format: 'application/n-quads',
     documentLoader,
@@ -78,7 +78,7 @@ export async function verifyVC(vc: VerifiableCredential): Promise<boolean> {
   if (!proof) return false
 
   // 2. Canonize the document (without proof)
-  const canonized = (await (jsonld as any).canonize(rest, {
+  const canonized = (await ((jsonld as any).default ?? jsonld).canonize(rest, {
     algorithm: 'URDNA2015',
     format: 'application/n-quads',
     documentLoader,
@@ -105,7 +105,7 @@ export async function verifyVC(vc: VerifiableCredential): Promise<boolean> {
 export async function ingestVC(vc: VerifiableCredential): Promise<Quad[]> {
   // 1. Convert VC to RDF (Quads)
   // jsonld.toRDF returns N-Quads string or dataset
-  const rdf = (await (jsonld as any).toRDF(vc, {
+  const rdf = (await ((jsonld as any).default ?? jsonld).toRDF(vc, {
     format: 'application/n-quads',
     documentLoader,
     safe: false

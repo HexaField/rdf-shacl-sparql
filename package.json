@@ -14,7 +14,10 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@playwright/test": "^1.57.0"
+    "@holochain/client": "0.20.4-rc.0",
+    "@msgpack/msgpack": "^3.1.3",
+    "@playwright/test": "^1.57.0",
+    "libsodium-wrappers": "0.7.15"
   },
   "devDependencies": {
     "@fastify/pre-commit": "^2.2.1",
@@ -36,5 +39,10 @@
     "*.{json,css,md,html}": [
       "oxfmt --write"
     ]
+  },
+  "pnpm": {
+    "overrides": {
+      "libsodium-wrappers": "0.7.15"
+    }
   }
 }

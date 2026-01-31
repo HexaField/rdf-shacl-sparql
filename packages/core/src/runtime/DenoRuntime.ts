@@ -39,7 +39,30 @@ export class DenoRuntime {
   private registerDefaultHandlers() {
     this.registerRpcHandler('Holochain.callApp', async (params) => {
       console.warn(`[Node] Holochain call received from Deno: ${params.functionName}`)
-      throw new Error('Holochain bridge not implemented in Node.js runtime yet.')
+      throw new Error('Holochain bridge callApp not implemented in Node.js runtime yet.')
+    })
+
+    this.registerRpcHandler('Holochain.registerDNAs', async (params) => {
+      // console.log(`[Node] Holochain registerDNAs`, params)
+      if (this.options.agentService && this.options.agentService.holochain) {
+        return this.options.agentService.holochain.registerDNAs(params.dnas)
+      }
+      return
+    })
+
+    this.registerRpcHandler('Holochain.call', async (params) => {
+      // console.log(`[Node] Holochain call`, params)
+      if (this.options.agentService && this.options.agentService.holochain) {
+        return this.options.agentService.holochain.call(params.dnaNick, params.zomeName, params.fnName, params.params)
+      }
+      throw new Error('Holochain service not available')
+    })
+
+    this.registerRpcHandler('Holochain.callAsync', async (params) => {
+      if (this.options.agentService && this.options.agentService.holochain) {
+        return this.options.agentService.holochain.callAsync(params.calls, params.timeoutMs)
+      }
+      throw new Error('Holochain service not available')
     })
 
     this.registerRpcHandler('Agent.did', async () => {

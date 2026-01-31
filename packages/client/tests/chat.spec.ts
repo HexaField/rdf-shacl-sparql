@@ -5,9 +5,6 @@ import fs from 'fs'
 import os from 'os'
 import net from 'net'
 
-// Use a shared temp directory for the test run to isolate from other runs
-const STORAGE_DIR = path.join(os.tmpdir(), `ad4m-test-storage-${Date.now()}`)
-
 const SERVERS: ChildProcess[] = []
 const CLIENTS: ChildProcess[] = []
 
@@ -42,10 +39,11 @@ async function waitForPort(port: number, timeout = 60000) {
 }
 
 // Helper to start a server
-async function startServer(port: number, storageDir: string) {
+async function startServer(port: number, storageDir: string, linkLanguage: string) {
   const rootDir = process.cwd().endsWith('client') ? path.resolve(process.cwd(), '../..') : process.cwd()
   const serverDir = path.join(rootDir, 'packages/server')
   const tsxPath = path.join(rootDir, 'node_modules/.bin/tsx')
+  console.log(`Starting Server ${port} with LINK_LANGUAGE=${linkLanguage}`)
   const p = spawn(tsxPath, ['src/index.ts'], {
     cwd: serverDir,
     // We pass STORAGE_DIR to the server process
@@ -54,7 +52,9 @@ async function startServer(port: number, storageDir: string) {
       PORT: port.toString(),
       STORAGE_DIR: storageDir,
       USE_LIBP2P: 'true',
-      HOST: 'localhost'
+      LINK_LANGUAGE: linkLanguage,
+      HOST: 'localhost',
+      HOLOCHAIN_DATA: path.join(storageDir, 'ad4m-holochain')
     },
     stdio: 'pipe'
   })
@@ -86,61 +86,87 @@ async function startClient(port: number) {
   console.log(`Client ${port} ready.`)
 }
 
-test.beforeAll(async () => {
-  test.setTimeout(120000)
-  // Clean storage
-  if (fs.existsSync(STORAGE_DIR)) fs.rmSync(STORAGE_DIR, { recursive: true, force: true })
-  fs.mkdirSync(STORAGE_DIR)
-
-  console.log(`Starting infrastructure in ${STORAGE_DIR}...`)
-
-  // Start Servers
-  await Promise.all([startServer(3005, STORAGE_DIR), startServer(3006, STORAGE_DIR)])
-  console.log('Servers started.')
-
-  // Start Single Client
-  await startClient(5001)
-  console.log('Client started.')
-})
-
-test.afterAll(async () => {
-  console.log('Shutting down...')
+async function killProcesses() {
+  console.log('Shutting down processes...')
   CLIENTS.forEach((p) => p.kill())
   SERVERS.forEach((p) => p.kill())
-  // Cleanup storage
-  if (fs.existsSync(STORAGE_DIR)) fs.rmSync(STORAGE_DIR, { recursive: true, force: true })
-})
+  CLIENTS.length = 0
+  SERVERS.length = 0
+}
 
-test('Chat reconciliation between two agents', async ({ browser }) => {
-  // Context 1 -> Client 1 (Agent A)
-  const context1 = await browser.newContext({ ignoreHTTPSErrors: true })
-  const page1 = await context1.newPage()
+const MODES = ['shacl', 'holochain']
 
-  // Context 2 -> Client 2 (Agent B)
-  const context2 = await browser.newContext({ ignoreHTTPSErrors: true })
-  const page2 = await context2.newPage()
+for (const mode of MODES) {
+  test(`Chat reconciliation (${mode})`, async ({ browser }) => {
+    test.setTimeout(180000)
 
-  // 1. Go to Home with specific ports
-  // Client 1 connects to Server 3005
-  await page1.goto('https://localhost:5001/?port=3005')
-  // Client 2 connects to Server 3006
-  await page2.goto('https://localhost:5001/?port=3006')
+    // Setup unique storage for this test run
+    // Use /tmp on macOS/Linux to avoid "UNIX socket path too long" error with Holochain/Lair
+    const tmpBase = process.platform === 'darwin' || process.platform === 'linux' ? '/tmp' : os.tmpdir()
+    const STORAGE_DIR = path.join(tmpBase, `ad4m-test-${mode}-${Date.now()}`)
+    if (fs.existsSync(STORAGE_DIR)) fs.rmSync(STORAGE_DIR, { recursive: true, force: true })
+    fs.mkdirSync(STORAGE_DIR)
 
-  // 2. Wait for Chat to appear (implies Joined Neighbourhood)
-  await expect(page1.getByText('Chat')).toBeVisible({ timeout: 15000 })
-  await expect(page2.getByText('Chat')).toBeVisible({ timeout: 15000 })
+    try {
+      // Start Infrastructure
+      // We offset ports for 'holochain' mode so parallel runs don't conflict (though pure serial here)
+      const portOffset = mode === 'holochain' ? 10 : 0
+      const serverPort1 = 3005 + portOffset
+      const serverPort2 = 3006 + portOffset
+      const clientPort = 5001 + portOffset
 
-  // 3. Client 1 types
-  const message = `Hello from Agent A ${Date.now()}`
-  // Find input by placeholder or role
-  const input = page1.locator('input[type="text"]')
-  await input.fill(message)
-  await page1.getByRole('button', { name: 'Send' }).click()
+      await Promise.all([
+        startServer(serverPort1, path.join(STORAGE_DIR, 'agent1'), mode),
+        startServer(serverPort2, path.join(STORAGE_DIR, 'agent2'), mode)
+      ])
+      console.log(`Servers started for ${mode}.`)
 
-  // 4. Verify Client 1 sees it immediately
-  await expect(page1.getByText(message)).toBeVisible()
+      // Start Single Client
+      await startClient(clientPort)
+      console.log(`Client started for ${mode}.`)
 
-  // 5. Verify Client 2 sees it (via sync)
-  // This confirms that Server 3005 wrote to its inbox, pushed to others, Server 3006 picked it up.
-  await expect(page2.getByText(message)).toBeVisible({ timeout: 10000 })
-})
+      // Context 1 -> Client 1 (Agent A)
+      const context1 = await browser.newContext({ ignoreHTTPSErrors: true })
+      const page1 = await context1.newPage()
+
+      // Context 2 -> Client 2 (Agent B)
+      const context2 = await browser.newContext({ ignoreHTTPSErrors: true })
+      const page2 = await context2.newPage()
+
+      // 1. Go to Home with specific ports
+      await page1.goto(`https://localhost:${clientPort}/?port=${serverPort1}`)
+      await page2.goto(`https://localhost:${clientPort}/?port=${serverPort2}`)
+
+      // 2. Wait for Chat to appear (implies Joined Neighbourhood)
+      await expect(page1.getByText('Chat')).toBeVisible({ timeout: 30000 })
+      await expect(page2.getByText('Chat')).toBeVisible({ timeout: 30000 })
+
+      // 3. Client 1 types
+      const message = `Hello from Agent A (${mode})`
+      const message2 = `Hello from Agent B (${mode})`
+
+      const input = page1.locator('input[type="text"]')
+      await input.fill(message)
+      await page1.getByRole('button', { name: 'Send' }).click()
+
+      const input2 = page2.locator('input[type="text"]')
+      await input2.fill(message2)
+      await page2.getByRole('button', { name: 'Send' }).click()
+
+      // 4. Verify Client 1 sees it immediately
+      await expect(page1.getByText(message)).toBeVisible({ timeout: 60000 })
+      await expect(page2.getByText(message2)).toBeVisible({ timeout: 60000 })
+
+      // 5. Verify Sync
+      await expect(page2.getByText(message)).toBeVisible({ timeout: 60000 })
+      await expect(page1.getByText(message2)).toBeVisible({ timeout: 60000 })
+    } catch (e) {
+      console.error(`Error during test (${mode}):`, e)
+      expect(e).toBeUndefined() // Fail the test
+    } finally {
+      await killProcesses()
+      // Cleanup storage
+      // if (fs.existsSync(STORAGE_DIR)) fs.rmSync(STORAGE_DIR, { recursive: true, force: true })
+    }
+  })
+}

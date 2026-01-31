@@ -30,14 +30,17 @@ const fetchMessages = async (perspectiveUuid: string) => {
       })
     })
     const json = await res.json()
+    // console.log('Chat fetched:', json)
     if (json.data && json.data.perspectiveQueryLinks) {
-      return json.data.perspectiveQueryLinks
+      const msgs = json.data.perspectiveQueryLinks
         .map((l: any) => ({
           author: l.author,
           text: l.data.target,
           timestamp: l.timestamp
         }))
         .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      // console.log('Processed messages:', msgs)
+      return msgs
     }
   } catch (e) {
     console.error('Chat fetch error', e)
@@ -66,7 +69,8 @@ const Chat: Component<ChatProps> = (props) => {
         }`
 
     try {
-      await fetch(getApiUrl(), {
+      console.log('Sending message:', text)
+      const res = await fetch(getApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,6 +78,8 @@ const Chat: Component<ChatProps> = (props) => {
           variables: { uuid: props.perspectiveUuid, text }
         })
       })
+      const json = await res.json()
+      // console.log('Send message result:', json)
       setInputText('')
       refetch()
     } catch (err) {

@@ -48,6 +48,19 @@ export class ShaclLanguage implements Language {
         timestamp: expression.timestamp,
         proof: expression.proof
       }
+    } else if (Array.isArray(data) && data.length > 0 && data[0].subject) {
+      // Case 3: data is Array of Quads (from server index.ts)
+      const q = data[0]
+      linkExpr = {
+        data: {
+          source: q.subject.value,
+          predicate: q.predicate.value,
+          target: q.object.value
+        },
+        author: expression.author,
+        timestamp: expression.timestamp,
+        proof: expression.proof
+      }
     }
 
     if (linkExpr) {

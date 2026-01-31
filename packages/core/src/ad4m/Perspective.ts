@@ -36,6 +36,7 @@ export class PerspectiveImpl implements Perspective {
 
     // 2. Add the Data Quad in the Named Graph
     const q = DataFactory.quad(s, p, o, graphId)
+    // console.log('[Perspective] Adding quad to store:', q.toString())
     await this.engine.add(q)
 
     // 2a. Add validation/query copy to Default Graph (to support simple SPARQL queries)

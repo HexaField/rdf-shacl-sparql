@@ -30,7 +30,11 @@ function createContextProxy(config: any) {
     ...config,
     // Proxy HolochainService
     Holochain: {
-      callApp: (functionName: string, args: any) => sendToParent('Holochain.callApp', { functionName, args })
+      callApp: (functionName: string, args: any) => sendToParent('Holochain.callApp', { functionName, args }),
+      registerDNAs: (dnas: any[], signalCb: any) => sendToParent('Holochain.registerDNAs', { dnas }),
+      call: (dnaNick: string, zomeName: string, fnName: string, params: object | string) =>
+        sendToParent('Holochain.call', { dnaNick, zomeName, fnName, params }),
+      callAsync: (calls: any[], timeoutMs?: number) => sendToParent('Holochain.callAsync', { calls, timeoutMs })
     },
     // Proxy AgentService
     Agent: {
