@@ -47,7 +47,7 @@ describe('AD4M Phase 3: Neighbourhoods', () => {
         if (links.length > 0) {
           clearInterval(interval)
           try {
-            expect(links[0].target).toBe('Hello World')
+            expect(links[0].data.target).toBe('Hello World')
             expect(links[0].author).toBe(agent1.did)
             resolve()
           } catch (e) {

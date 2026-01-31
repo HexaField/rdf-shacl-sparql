@@ -13,6 +13,9 @@
     "check": "pnpm -r check && oxlint",
     "prepare": "husky"
   },
+  "dependencies": {
+    "@playwright/test": "^1.57.0"
+  },
   "devDependencies": {
     "@fastify/pre-commit": "^2.2.1",
     "@types/node": "^25.0.3",

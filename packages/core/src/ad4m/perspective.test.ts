@@ -18,28 +18,34 @@ describe('AD4M Phase 1: Perspectives', () => {
 
   it('should add and retrieve a Link', async () => {
     const link = {
-      source: 'did:key:alice',
-      predicate: 'http://xmlns.com/foaf/0.1/knows',
-      target: 'did:key:bob',
+      data: {
+        source: 'did:key:alice',
+        predicate: 'http://xmlns.com/foaf/0.1/knows',
+        target: 'did:key:bob'
+      },
       author: 'did:key:alice',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      proof: { signature: 'sig', key: 'key' }
     }
 
     await perspective.add(link)
 
     const storedLinks = await perspective.all()
     expect(storedLinks).toHaveLength(1)
-    expect(storedLinks[0].source).toBe('did:key:alice')
-    expect(storedLinks[0].target).toBe('did:key:bob')
+    expect(storedLinks[0].data.source).toBe('did:key:alice')
+    expect(storedLinks[0].data.target).toBe('did:key:bob')
   })
 
   it('should query links using SPARQL', async () => {
     const link = {
-      source: 'http://example.org/alice',
-      predicate: 'http://xmlns.com/foaf/0.1/name',
-      target: 'Alice',
+      data: {
+        source: 'http://example.org/alice',
+        predicate: 'http://xmlns.com/foaf/0.1/name',
+        target: 'Alice'
+      },
       author: 'did:key:alice',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      proof: { signature: 'sig', key: 'key' }
     }
     await perspective.add(link)
 
@@ -55,11 +61,14 @@ describe('AD4M Phase 1: Perspectives', () => {
 
   it('should remove a link', async () => {
     const link = {
-      source: 'http://example.org/alice',
-      predicate: 'http://xmlns.com/foaf/0.1/name',
-      target: 'Alice',
+      data: {
+        source: 'http://example.org/alice',
+        predicate: 'http://xmlns.com/foaf/0.1/name',
+        target: 'Alice'
+      },
       author: 'did:key:alice',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      proof: { signature: 'sig', key: 'key' }
     }
     await perspective.add(link)
 
@@ -113,11 +122,14 @@ describe('AD4M Phase 1: Agent Integration', () => {
     const p2 = await agent.perspectives.add('B')
 
     await p1.add({
-      source: 'did:key:A',
-      predicate: 'http://p',
-      target: 'did:key:B',
+      data: {
+        source: 'did:key:A',
+        predicate: 'http://p',
+        target: 'did:key:B'
+      },
       author: agent.did,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      proof: { signature: 'sig', key: 'key' }
     })
 
     const links1 = await p1.all()

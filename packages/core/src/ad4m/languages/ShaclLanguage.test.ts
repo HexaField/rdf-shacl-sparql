@@ -57,8 +57,8 @@ describe('AD4M Phase 2: ShaclLanguage', () => {
 
     const links = await perspective.all()
     expect(links).toHaveLength(1)
-    expect(links[0].source).toBe(author.did)
-    expect(links[0].predicate).toBe('http://schema.org/name')
-    expect(links[0].target).toBe('Alice')
+    expect(links[0].data.source).toBe(author.did)
+    expect(links[0].data.predicate).toBe('http://schema.org/name')
+    expect(links[0].data.target).toBe('Alice')
   })
 })

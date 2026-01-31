@@ -23,7 +23,7 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'PORT=3000 npm run dev',
     url: 'https://localhost:3000',
     reuseExistingServer: !process.env.CI,
     ignoreHTTPSErrors: true

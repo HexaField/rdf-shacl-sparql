@@ -33,8 +33,8 @@ export interface Perspective {
   readonly id: string
   readonly name?: string
 
-  add(link: Link): Promise<void>
-  remove(link: Link): Promise<void>
+  add(link: LinkExpression): Promise<void>
+  remove(link: LinkExpression): Promise<void>
   query(sparql: string): Promise<any[]>
   all(): Promise<LinkExpression[]>
 }

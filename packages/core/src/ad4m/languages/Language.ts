@@ -1,5 +1,6 @@
 import type { Expression, Perspective } from '../types'
 import type { KeyManager } from '../../identity'
+import type { LinkSyncAdapter } from './LinkSyncAdapter'
 
 /**
  * AD4M Language Interface.
@@ -8,6 +9,11 @@ import type { KeyManager } from '../../identity'
 export interface Language {
   /** Unique hash/id of the language code/logic */
   readonly address: string
+
+  /**
+   * Optional LinkSyncAdapter if this is a Link Language
+   */
+  readonly linksAdapter?: LinkSyncAdapter
 
   /**
    * Factory method to create a valid Expression from raw data.

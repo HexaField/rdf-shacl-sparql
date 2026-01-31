@@ -12,7 +12,7 @@ import express from 'express'
 import healthRouter from './routes/health'
 
 // Core imports
-import { Agent, KeyManager, MockCarrier, ShaclLanguage, type Link } from '@template/core'
+import { Agent, KeyManager, MockCarrier, ShaclLanguage, type Link, Libp2pCarrier } from '@template/core'
 import { LocalFilesystemCarrier } from './network/LocalFilesystemCarrier'
 
 dotenv.config({ path: '.env.local' })
@@ -36,14 +36,23 @@ const keys = await KeyManager.generate()
 const storageDir = process.env.STORAGE_DIR || path.join(os.tmpdir(), 'ad4m-storage')
 
 // If NETWORK_FILE is present (from old scripts) we treat it as signal to use P2P
-const network =
-  process.env.NETWORK_FILE || process.env.USE_P2P === 'true'
-    ? new LocalFilesystemCarrier(keys.did, storageDir)
-    : new MockCarrier(keys.did)
+let network
+if (process.env.USE_LIBP2P === 'true') {
+  network = new Libp2pCarrier()
+  await (network as Libp2pCarrier).start()
+} else {
+  network =
+    process.env.NETWORK_FILE || process.env.USE_P2P === 'true'
+      ? new LocalFilesystemCarrier(keys.did, storageDir)
+      : new MockCarrier(keys.did)
+}
 
 console.log(`Agent ${keys.did.substring(0, 8)} starting. Mode: ${network.constructor.name}`)
 if (network instanceof LocalFilesystemCarrier) {
   // Ensure storage initialized implicitly by carrier
+}
+if (network instanceof Libp2pCarrier) {
+  console.log('Libp2p Peer ID:', network.id)
 }
 
 const agent = new Agent(keys, undefined, network)
@@ -124,15 +133,15 @@ const resolvers = {
       const allLinks = await p.all()
       return allLinks
         .filter((l) => {
-          if (query.source && l.source !== query.source) return false
-          if (query.predicate && l.predicate !== query.predicate) return false
-          if (query.target && l.target !== query.target) return false
+          if (query.source && l.data.source !== query.source) return false
+          if (query.predicate && l.data.predicate !== query.predicate) return false
+          if (query.target && l.data.target !== query.target) return false
           return true
         })
         .map((l) => ({
           author: l.author,
           timestamp: l.timestamp,
-          data: { source: l.source, predicate: l.predicate, target: l.target },
+          data: { source: l.data.source, predicate: l.data.predicate, target: l.data.target },
           proof: l.proof
         }))
     },
@@ -151,15 +160,20 @@ const resolvers = {
       }
       if (!p) throw new Error('Perspective not found')
 
+      // Use a placeholder signature until we have full signing flow here.
+      // In reality, this should be signed by agent.
+      // But for Perspective.add(), we need a LinkExpression.
+
       const newLink = {
-        ...link,
+        data: link,
         author: agent.did,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        proof: { signature: 'server-signed-placeholder', key: agent.did }
       }
 
       if (isNeighbourhood && 'publish' in p) {
         // @ts-ignore
-        await p.publish(newLink)
+        await p.publish(newLink) // publish likely expects quads or raw data in ShaclLanguage
       } else {
         await p.add(newLink)
       }
@@ -168,7 +182,7 @@ const resolvers = {
         author: newLink.author,
         timestamp: newLink.timestamp,
         data: link,
-        proof: null
+        proof: newLink.proof
       }
     },
     perspectiveRemoveLink: async (_: any, { uuid, link }: { uuid: string; link: Link }) => {
@@ -177,9 +191,10 @@ const resolvers = {
       if (!p) throw new Error('Perspective not found')
 
       const linkToRemove = {
-        ...link,
-        author: '', // Author ignored by removal logic currently
-        timestamp: ''
+        data: link,
+        author: '',
+        timestamp: '',
+        proof: { signature: 'dummy', key: '' } // Removal often uses content-addressing or structure matching, proof implied by request auth
       }
       await p.remove(linkToRemove)
       return true
@@ -202,7 +217,7 @@ const resolvers = {
       return links.map((l) => ({
         author: l.author,
         timestamp: l.timestamp,
-        data: { source: l.source, predicate: l.predicate, target: l.target },
+        data: { source: l.data.source, predicate: l.data.predicate, target: l.data.target },
         proof: l.proof
       }))
     }

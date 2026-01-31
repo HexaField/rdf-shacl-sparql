@@ -8,6 +8,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     plugins: [solid(), tailwindcss()],
+    define: {
+      'process.env': {},
+      'process.cwd': '() => "/"',
+      'process.nextTick': '(cb) => setTimeout(cb, 0)'
+    },
     server: {
       host: env.HOST || 'localhost',
       port: parseInt(env.PORT || '3000'),

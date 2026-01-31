@@ -8,3 +8,4 @@ export * from './agent'
 export const SHARED_CONSTANT = 'AD4M Core'
 
 export * from './ad4m/types'
+export * from './runtime/DenoRuntime'

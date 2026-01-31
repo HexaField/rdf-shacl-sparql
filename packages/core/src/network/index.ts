@@ -91,3 +91,4 @@ export class MockCarrier implements Carrier {
 }
 
 export * from './FileCarrier'
+export * from './Libp2pCarrier'
