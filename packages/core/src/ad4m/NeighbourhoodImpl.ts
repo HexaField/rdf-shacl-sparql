@@ -9,8 +9,14 @@ export class NeighbourhoodImpl extends PerspectiveImpl implements Neighbourhood 
   private agentKeys: KeyManager
   private sendFn: (payload: any) => Promise<void>
 
-  constructor(url: string, language: Language, agentKeys: KeyManager, sendFn: (payload: any) => Promise<void>) {
-    super(url, url) // ID and Name are the URL for now
+  constructor(
+    url: string,
+    language: Language,
+    agentKeys: KeyManager,
+    sendFn: (payload: any) => Promise<void>,
+    saveHook?: (data: string) => Promise<void>
+  ) {
+    super(url, url, saveHook) // ID and Name are the URL for now
     this.url = url
     this.language = language
     this.agentKeys = agentKeys

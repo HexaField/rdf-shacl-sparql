@@ -8,6 +8,7 @@ export * from './agent'
 export const SHARED_CONSTANT = 'AD4M Core'
 
 export * from './ad4m/types'
+export * from './ad4m/utils'
 export * from './ad4m/languages/Holochain'
 export * from './ad4m/languages/HolochainLanguage'
 export * from './runtime/DenoRuntime'

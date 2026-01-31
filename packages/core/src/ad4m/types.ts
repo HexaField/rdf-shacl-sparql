@@ -18,7 +18,7 @@ export interface Expression {
 
 export interface Link {
   source: string
-  predicate?: string
+  predicate: string
   target: string
 }
 

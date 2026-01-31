@@ -84,45 +84,45 @@ export class Libp2pCarrier extends EventEmitter implements Carrier {
     const msg = JSON.stringify(envelope)
     const encoded = new TextEncoder().encode(msg)
 
-    if (envelope.recipient === 'broadcast') {
-      const peers = this.node.getPeers()
-      console.log(`[Libp2pCarrier] Broadcasting to ${peers.length} peers`)
-      for (const peerId of peers) {
-        try {
-          const stream = await this.node.dialProtocol(peerId, AD4M_PROTOCOL)
+    // Naive Implementation: Always flood/broadcast to all connected peers
+    // In a real DHT/Overlay, we would route to the specific PeerID holding the DID.
+    const peers = this.node.getPeers()
+    const label = envelope.recipient === 'broadcast' ? 'Broadcast' : `Direct(${envelope.recipient})`
+    // console.log(`[Libp2pCarrier] ${label} sending to ${peers.length} peers`)
 
-          // Polyfill sink if missing (seems to happen with current versions)
+    for (const peerId of peers) {
+      try {
+        const stream = await this.node.dialProtocol(peerId, AD4M_PROTOCOL)
+
+        // Polyfill sink if missing (seems to happen with current versions)
+        // @ts-ignore
+        if (!stream.sink) {
           // @ts-ignore
-          if (!stream.sink) {
-            // @ts-ignore
-            stream.sink = async (source: any) => {
-              for await (const msg of source) {
-                // @ts-ignore
-                if (typeof stream.sendData === 'function') {
-                  // Hack: mplex expects sublist but Uint8Array has subarray
-                  if (msg && !msg.sublist && msg.subarray) {
-                    msg.sublist = msg.subarray
-                  }
-                  // @ts-ignore
-                  stream.sendData(msg)
+          stream.sink = async (source: any) => {
+            for await (const msg of source) {
+              // @ts-ignore
+              if (typeof stream.sendData === 'function') {
+                // Hack: mplex expects sublist but Uint8Array has subarray
+                if (msg && !msg.sublist && msg.subarray) {
+                  msg.sublist = msg.subarray
                 }
+                // @ts-ignore
+                stream.sendData(msg)
               }
             }
           }
-
-          // @ts-ignore
-          if (stream.sink) {
-            // @ts-ignore
-            await pipe([encoded], stream.sink)
-          }
-
-          await stream.close()
-        } catch (e) {
-          console.error(`[Libp2pCarrier] Failed to send to ${peerId}:`, e)
         }
+
+        // @ts-ignore
+        if (stream.sink) {
+          // @ts-ignore
+          await pipe([encoded], stream.sink)
+        }
+
+        await stream.close()
+      } catch (e) {
+        console.error(`[Libp2pCarrier] Failed to send to ${peerId}:`, e)
       }
-    } else {
-      console.warn(`[Libp2pCarrier] Sending envelope to ${envelope.recipient} (Not fully implemented)`)
     }
   }
 

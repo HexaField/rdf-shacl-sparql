@@ -66,6 +66,20 @@ export class QueryEngine {
 
     return { bindings: [] }
   }
+
+  serialize(): string {
+    const quads = this.store.match(undefined, undefined, undefined, undefined)
+    let output = ''
+    for (const q of quads) {
+      output += q.toString() + ' .\n'
+    }
+    return output
+  }
+
+  deserialize(nquads: string): void {
+    if (!nquads) return
+    this.store.load(nquads, 'application/n-quads')
+  }
 }
 
 // 3. Authorization

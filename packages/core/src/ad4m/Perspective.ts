@@ -12,11 +12,17 @@ export class PerspectiveImpl implements Perspective {
   public readonly id: string
   public readonly name?: string
   private engine: QueryEngine
+  private saveHook?: (data: string) => Promise<void>
 
-  constructor(id: string, name?: string) {
+  constructor(id: string, name?: string, saveHook?: (data: string) => Promise<void>) {
     this.id = id
     this.name = name
+    this.saveHook = saveHook
     this.engine = new QueryEngine()
+  }
+
+  load(data: string) {
+    this.engine.deserialize(data)
   }
 
   async add(expression: LinkExpression): Promise<void> {
@@ -55,6 +61,8 @@ export class PerspectiveImpl implements Perspective {
         DataFactory.quad(graphId, PRED_PROOF, DataFactory.literal(JSON.stringify(expression.proof)))
       )
     }
+
+    if (this.saveHook) await this.saveHook(this.engine.serialize())
   }
 
   async remove(expression: LinkExpression): Promise<void> {
@@ -99,6 +107,8 @@ export class PerspectiveImpl implements Perspective {
         oIsNode ? DataFactory.namedNode(link.target) : DataFactory.literal(link.target)
       )
     )
+
+    if (this.saveHook) await this.saveHook(this.engine.serialize())
   }
   async query(sparql: string): Promise<any[]> {
     const result = await this.engine.execute(sparql)

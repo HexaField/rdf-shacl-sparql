@@ -23,6 +23,14 @@ export class KeyManager implements Signer {
     return new KeyManager(privateKey)
   }
 
+  static fromPrivateKey(privateKey: Uint8Array): KeyManager {
+    return new KeyManager(privateKey)
+  }
+
+  getPrivateKey(): Uint8Array {
+    return this.privateKey
+  }
+
   // Sign using Ed25519
   async sign(data: Uint8Array): Promise<Uint8Array> {
     return ed25519.sign(data, this.privateKey)

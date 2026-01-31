@@ -40,10 +40,25 @@ const options = {
 const httpsServer = https.createServer(options, app)
 
 // --- AD4M Setup ---
-const keys = await KeyManager.generate()
-
 // Use STORAGE_DIR env var or default to a safe temp location for testing
 const storageDir = process.env.STORAGE_DIR || path.join(os.tmpdir(), 'ad4m-storage')
+
+if (!fs.existsSync(storageDir)) {
+  fs.mkdirSync(storageDir, { recursive: true })
+}
+
+const keyPath = path.join(storageDir, 'agent.key')
+let keys: KeyManager
+
+if (fs.existsSync(keyPath)) {
+  const privateKey = fs.readFileSync(keyPath)
+  keys = KeyManager.fromPrivateKey(new Uint8Array(privateKey))
+  console.log(`[Server] Loaded identity from ${keyPath}`)
+} else {
+  keys = await KeyManager.generate()
+  fs.writeFileSync(keyPath, keys.getPrivateKey())
+  console.log(`[Server] Generated new identity and saved to ${keyPath}`)
+}
 
 // If NETWORK_FILE is present (from old scripts) we treat it as signal to use P2P
 let network
@@ -93,8 +108,75 @@ if (fs.existsSync(happPath)) {
   }
 }
 
-const agent = new Agent(keys, undefined, network)
+// --- Persistence ---
+// Persister implementation for Agent
+const persister = {
+  load: async (id: string) => {
+    const safeId = encodeURIComponent(id)
+    const p = path.join(storageDir, 'perspectives', `${safeId}.nq`)
+    if (fs.existsSync(p)) {
+      return fs.readFileSync(p, 'utf-8')
+    }
+    return null
+  },
+  save: async (id: string, data: string) => {
+    const perspectivesDir = path.join(storageDir, 'perspectives')
+    if (!fs.existsSync(perspectivesDir)) {
+      fs.mkdirSync(perspectivesDir, { recursive: true })
+    }
+    const safeId = encodeURIComponent(id)
+    const p = path.join(perspectivesDir, `${safeId}.nq`)
+    fs.writeFileSync(p, data)
+  }
+}
+
+const agent = new Agent(keys, undefined, network, persister)
 agent.holochain = holochainDriver
+
+// --- Persistence (Neighbourhood List) ---
+const statePath = path.join(storageDir, 'state.json')
+
+const saveState = async () => {
+  const state = {
+    neighbourhoods: agent.neighbourhoods.all().map((n) => ({
+      url: n.url,
+      language: n.language instanceof HolochainLanguage ? 'holochain' : 'shacl'
+    }))
+  }
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
+  console.log('[Server] Saved state')
+}
+
+// Wrap Neighbourhood Manager
+const originalJoin = agent.neighbourhoods.join.bind(agent.neighbourhoods)
+agent.neighbourhoods.join = async (url, language) => {
+  const n = await originalJoin(url, language)
+  await saveState()
+  return n
+}
+const originalLeave = agent.neighbourhoods.leave.bind(agent.neighbourhoods)
+agent.neighbourhoods.leave = async (url) => {
+  const res = await originalLeave(url)
+  await saveState()
+  return res
+}
+
+// Restore
+if (fs.existsSync(statePath)) {
+  try {
+    const state = JSON.parse(fs.readFileSync(statePath, 'utf-8'))
+    console.log(`[Server] Restoring ${state.neighbourhoods.length} neighbourhoods...`)
+    for (const n of state.neighbourhoods) {
+      const useHolochain = n.language === 'holochain'
+      const lang = useHolochain ? new HolochainLanguage(holochainDriver, 'main-app') : new ShaclLanguage()
+      await originalJoin(n.url, lang)
+      console.log(`[Server] Restored ${n.url} (${n.language})`)
+    }
+  } catch (e) {
+    console.error('[Server] Failed to restore state:', e)
+  }
+}
+
 const mainPerspective = await agent.perspectives.add('Public Profile')
 
 // --- GraphQL Schema ---
@@ -142,12 +224,14 @@ const typeDefs = `#graphql
     perspective(uuid: String!): Perspective
     perspectiveQueryLinks(uuid: String!, query: LinkQuery!): [LinkExpression!]!
     neighbourhood(url: String!): Perspective
+    neighbourhoods: [Perspective!]!
   }
 
   type Mutation {
     perspectiveAddLink(uuid: String!, link: LinkInput!): LinkExpression!
     perspectiveRemoveLink(uuid: String!, link: LinkInput!): Boolean
-    neighbourhoodJoinFromUrl(url: String!): Perspective
+    neighbourhoodJoinFromUrl(url: String!, language: String): Perspective
+    neighbourhoodLeave(url: String!): Boolean
   }
 `
 
@@ -190,6 +274,10 @@ const resolvers = {
     neighbourhood: (_: any, { url }: { url: string }) => {
       const n = agent.neighbourhoods.get(url)
       return n ? { uuid: n.url, name: 'Neighbourhood' } : null
+    },
+    neighbourhoods: () => {
+      const all = agent.neighbourhoods.all()
+      return all.map((n) => ({ uuid: n.url, name: n.name || 'Joined Neighbourhood' }))
     }
   },
   Mutation: {
@@ -252,15 +340,22 @@ const resolvers = {
       await p.remove(linkToRemove)
       return true
     },
-    neighbourhoodJoinFromUrl: async (_: any, { url }: { url: string }) => {
-      // Choose language based on ENV
-      const useHolochain = process.env.LINK_LANGUAGE === 'holochain'
-      console.log(`[Server] Joining neighbourhood with LinkLanguage: ${useHolochain ? 'Holochain' : 'Shacl'}`)
+    neighbourhoodJoinFromUrl: async (_: any, { url, language }: { url: string; language?: string }) => {
+      // Choose language based on argument or ENV
+      let useHolochain = process.env.LINK_LANGUAGE === 'holochain'
+      if (language) {
+        useHolochain = language === 'holochain'
+      }
+
+      console.log(`[Server] Joining neighbourhood with LinkLanguage: ${useHolochain ? 'Holochain' : 'Shacl (Libp2p)'}`)
 
       const lang = useHolochain ? new HolochainLanguage(holochainDriver, 'main-app') : new ShaclLanguage()
 
       const n = await agent.neighbourhoods.join(url, lang)
       return { uuid: n.url, name: 'Joined Neighbourhood' }
+    },
+    neighbourhoodLeave: async (_: any, { url }: { url: string }) => {
+      return await agent.neighbourhoods.leave(url)
     }
   },
   Perspective: {

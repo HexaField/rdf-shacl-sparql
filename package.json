@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm --filter @template/client dev\" \"pnpm --filter @template/server dev\"",
-    "dev:multi": "rm -rf /tmp/ad4m-dev-multi && concurrently \"pnpm --filter @template/client dev\" \"PORT=3005 STORAGE_DIR=/tmp/ad4m-dev-multi USE_P2P=true pnpm --filter @template/server dev\" \"PORT=3006 STORAGE_DIR=/tmp/ad4m-dev-multi USE_P2P=true pnpm --filter @template/server dev\"",
+    "dev:multi": "concurrently \"pnpm --filter @template/client dev\" \"PORT=3005 STORAGE_DIR=/tmp/ad4m-dev-multi/agent1 HOLOCHAIN_DATA=/tmp/ad4m-dev-multi/agent1/ad4m-holochain USE_LIBP2P=true pnpm --filter @template/server dev\" \"PORT=3006 STORAGE_DIR=/tmp/ad4m-dev-multi/agent2 HOLOCHAIN_DATA=/tmp/ad4m-dev-multi/agent2/ad4m-holochain USE_LIBP2P=true pnpm --filter @template/server dev\"",
+    "dev:wipe": "rm -rf /tmp/ad4m-dev-multi",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r test",
     "certs": "mkdir -p .certs && openssl req -x509 -newkey rsa:2048 -keyout .certs/localhost.key -out .certs/localhost.cert -days 365 -nodes -subj \"/CN=localhost\"",

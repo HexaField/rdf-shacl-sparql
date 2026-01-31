@@ -9,9 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [solid(), tailwindcss()],
     define: {
-      'process.env': {},
-      'process.cwd': '() => "/"',
-      'process.nextTick': '(cb) => setTimeout(cb, 0)'
+      'process.env': {}
     },
     server: {
       host: env.HOST || 'localhost',
